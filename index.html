@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>APR Intake Widget — Universal Homeschool</title>
+<style>
+/* ── PASTE THIS ENTIRE FILE INTO A visualize:show_widget CALL ── */
+/* Remove the DOCTYPE / html / head / body tags before pasting  */
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     APR INTAKE WIDGET v2  —  Universal MOE Homeschool
+     Architecture:
+       Step 0: Upload previous APR .docx → mammoth extracts text client-side
+               → sendPrompt to Claude → paste JSON back → import
+       Step 1: Set up children (name, level, science Y/N)
+       Step 2: Curricula (textarea per subject per child)
+       Step 3: Strengths (matrix), Gaps (matrix, max 2), Action plan rating
+       Step 4: CCE toggles + calendar scan via sendPrompt + paste-back import
+       Step 5: Assessment scores (3 samples per subject)
+       Generate: sendPrompt with full structured data for APR draft generation
+     ═══════════════════════════════════════════════════════════ -->
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.app{padding:1.5rem 0;max-width:680px}
+.pbar{display:flex;gap:3px;margin-bottom:2rem}
+.pseg{height:3px;flex:1;border-radius:2px;background:var(--color-border-tertiary);transition:background .2s}
+.pseg.done{background:#1D9E75}.pseg.active{background:#534AB7}
+.step{display:none}.step.active{display:block}
+.slabel{font-size:12px;color:var(--color-text-secondary);letter-spacing:.04em;margin-bottom:4px}
+.stitle{font-size:20px;font-weight:500;color:var(--color-text-primary);margin-bottom:.25rem}
+.ssub{font-size:14px;color:var(--color-text-secondary);margin-bottom:1.5rem;line-height:1.6}
+.card{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:.75rem}
+.ctitle{font-size:13px;font-weight:500;color:var(--color-text-secondary);margin-bottom:.75rem;display:flex;align-items:center;gap:6px}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;padding-top:1rem;border-top:.5px solid var(--color-border-tertiary)}
+.btn{font-size:14px;padding:8px 16px;border-radius:var(--border-radius-md);cursor:pointer;border:.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-primary)}
+.btn-p{background:#534AB7;border-color:#534AB7;color:#fff}
+.btn-g{background:#1D9E75;border-color:#0F6E56;color:#fff}
+.tabs{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap}
+.tab{padding:5px 14px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);font-size:13px;cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary)}
+.tab.on{background:#EEEDFE;border-color:#534AB7;color:#3C3489;font-weight:500}
+.tab.onb{background:var(--color-background-secondary);border-color:var(--color-border-primary);color:var(--color-text-primary);font-weight:500}
+.mx{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
+.mi{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);cursor:pointer;background:var(--color-background-primary)}
+.mi:hover{border-color:var(--color-border-secondary)}
+.mi.s{background:#EEEDFE;border-color:#534AB7}
+.mi.sg{background:#FAECE7;border-color:#993C1D}
+.mck{width:16px;height:16px;border:1.5px solid var(--color-border-secondary);border-radius:3px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center}
+.mi.s .mck{background:#534AB7;border-color:#534AB7}
+.mi.s .mck::after,.mi.sg .mck::after{content:'';display:block;width:8px;height:5px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translateY(-1px)}
+.mi.sg .mck{background:#993C1D;border-color:#993C1D}
+.ml{font-size:13px;color:var(--color-text-primary);line-height:1.4}
+.aibadge{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#3C3489;background:#EEEDFE;border-radius:3px;padding:1px 5px;margin-left:3px;vertical-align:middle}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 10px;border-radius:20px;font-weight:500}
+.pill-ok{background:#E1F5EE;color:#085041}
+.pill-err{background:#FAECE7;color:#712B13}
+.aprow{padding:10px 0;border-bottom:.5px solid var(--color-border-tertiary)}
+.aprow:last-child{border-bottom:none}
+.aptxt{font-size:13px;color:var(--color-text-primary);margin-bottom:8px;line-height:1.5}
+.apbtns{display:flex;gap:5px;flex-wrap:wrap}
+.apbtn{font-size:12px;padding:4px 10px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary)}
+.apbtn.sf{background:#EAF3DE;border-color:#3B6D11;color:#27500A}
+.apbtn.sm{background:#E6F1FB;border-color:#185FA5;color:#0C447C}
+.apbtn.sp{background:#FAEEDA;border-color:#854F0B;color:#633806}
+.apbtn.so{background:#EEEDFE;border-color:#534AB7;color:#3C3489}
+.apsl-wrap{margin-top:6px}
+.apsl{width:100%;display:block;margin:4px 0}
+.apsl-labels{display:grid;grid-template-columns:repeat(4,1fr);text-align:center;font-size:11px;color:var(--color-text-secondary);line-height:1.3;margin-bottom:2px;padding:0 8px}
+.apsl-foot{min-height:18px;margin-top:2px}
+.apsl-status{font-size:12px;font-weight:500;color:var(--color-text-secondary)}
+.apsl-status.sf{color:#27500A}.apsl-status.sm{color:#0C447C}.apsl-status.sp{color:#633806}.apsl-status.so{color:#3C3489}
+.cce-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:.5px solid var(--color-border-tertiary)}
+.cce-row:last-child{border-bottom:none}
+.tog{width:32px;height:18px;border-radius:9px;background:var(--color-border-tertiary);cursor:pointer;flex-shrink:0;margin-top:2px;position:relative;transition:background .15s;border:none}
+.tog.on{background:#1D9E75!important}
+.tog::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .15s}
+.tog.on::after{left:16px}
+.ccename{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.ccetype{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.secdiv{font-size:11px;font-weight:500;color:var(--color-text-secondary);letter-spacing:.06em;text-transform:uppercase;margin:1rem 0 .5rem;padding-bottom:.25rem;border-bottom:.5px solid var(--color-border-tertiary)}
+.calbx{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:1rem;margin-bottom:1rem}
+.calrow{display:flex;align-items:flex-start;gap:10px;padding:.4rem 0}
+.calnum{width:22px;height:22px;border-radius:50%;background:#534AB7;color:#fff;font-size:11px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.caltxt{font-size:13px;color:var(--color-text-primary);line-height:1.5}
+input[type=text],select,textarea{font-size:13px;padding:6px 8px;border:.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);width:100%}
+textarea{resize:vertical;font-family:var(--font-sans)}
+.crow{display:grid;grid-template-columns:1fr 120px 130px auto;gap:8px;align-items:end;margin-bottom:8px}
+.lbl{font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;display:block}
+.addch{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#534AB7;border:.5px dashed #534AB7;background:transparent;border-radius:var(--border-radius-md);padding:6px 12px;cursor:pointer;margin-top:4px}
+.dropzone{border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:2rem 1.5rem;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:var(--color-background-secondary)}
+.dropzone:hover,.dropzone.over{border-color:#534AB7;background:#EEEDFE}
+.dropzone.ready{border-color:#1D9E75;background:#E1F5EE}
+.dropzone input[type=file]{display:none}
+.dz-icon{font-size:28px;color:var(--color-text-secondary);margin-bottom:.5rem}
+.dz-label{font-size:14px;font-weight:500;color:var(--color-text-primary);margin-bottom:.25rem}
+.dz-sub{font-size:12px;color:var(--color-text-secondary)}
+</style>
+
+<h2 class="sr-only">MOE Annual Progress Report universal intake form</h2>
+<div class="app">
+<div class="pbar" id="pbar"></div>
+
+<div class="step active" id="s0">
+  <p class="slabel">Step 0 of 5 — Extract</p>
+  <p class="stitle">Extract from previous APR</p>
+  <p class="ssub">Upload last year's APR Word document and Claude will extract the data. Skip this step if it's your first year.</p>
+  <div class="card">
+    <div class="ctitle"><i class="ti ti-file-upload" aria-hidden="true"></i> Upload previous APR (.docx)</div>
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('aprFile').click()" ondragover="dzOver(event)" ondragleave="dzLeave(event)" ondrop="dzDrop(event)">
+      <input type="file" id="aprFile" accept=".docx" onchange="handleFile(this.files[0])">
+      <div class="dz-icon"><i class="ti ti-file-type-docx" aria-hidden="true"></i></div>
+      <p class="dz-label" id="dzLabel">Click to choose file, or drag and drop</p>
+      <p class="dz-sub" id="dzSub">.docx files only</p>
+    </div>
+    <div style="margin-top:.75rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="sendForExtraction()"><i class="ti ti-sparkles" aria-hidden="true"></i> Send to Claude for extraction &#x2197;</button>
+      <span id="fileStatus" style="font-size:13px;color:var(--color-text-secondary)">Upload a file, then send to Claude.</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle"><i class="ti ti-clipboard-text" aria-hidden="true"></i> Or paste APR text directly</div>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:.75rem">If the file picker doesn't open, copy-paste the text content of your APR here instead.</p>
+    <textarea id="aprTextPaste" rows="5" placeholder="Paste the full text of last year's APR here..." oninput="aprExtractedText=this.value;document.getElementById('fileStatus').textContent=this.value.trim().length>50?'Text ready — click Send to Claude.':'';"></textarea>
+  </div>
+    <div class="ctitle"><i class="ti ti-clipboard-text" aria-hidden="true"></i> Paste Claude's extracted JSON here</div>
+    <textarea id="jsonPaste" rows="5" placeholder='[{"name":"Child Name","level":"P6","hasSci":true,"curricula":{...},"strengths":{...},...}]'></textarea>
+    <div style="margin-top:.75rem;display:flex;align-items:center;gap:10px">
+      <button class="btn btn-p" onclick="importJSON()"><i class="ti ti-download" aria-hidden="true"></i> Import</button>
+      <span id="importStatus"></span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle"><i class="ti ti-arrow-right" aria-hidden="true"></i> First year or skipping extraction</div>
+    <p style="font-size:13px;color:var(--color-text-secondary)">Click Next to set up your children manually.</p>
+  </div>
+  <div class="nav"><span></span><button class="btn btn-p" onclick="go(1)">Next: children <i class="ti ti-arrow-right" aria-hidden="true"></i></button></div>
+</div>
+
+<div class="step" id="s1">
+  <p class="slabel">Step 1 of 5 — Children</p>
+  <p class="stitle">Who are you reporting for?</p>
+  <p class="ssub">One row per child, up to four.</p>
+  <div id="childRows"></div>
+  <button class="addch" onclick="addChild()" id="addChBtn"><i class="ti ti-plus" aria-hidden="true"></i> Add child</button>
+  <div class="nav">
+    <button class="btn" onclick="go(0)"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+    <button class="btn btn-p" onclick="go(2)">Next: curricula <i class="ti ti-arrow-right" aria-hidden="true"></i></button>
+  </div>
+</div>
+
+<div class="step" id="s2">
+  <p class="slabel">Step 2 of 5 — Curricula</p>
+  <p class="stitle">Confirm curricula in use</p>
+  <p class="ssub">List the programmes each child is using this year per subject.</p>
+  <div class="tabs" id="ct2"></div>
+  <div id="curricBody"></div>
+  <div class="nav">
+    <button class="btn" onclick="go(1)"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+    <button class="btn btn-p" onclick="go(3)">Next: strengths <i class="ti ti-arrow-right" aria-hidden="true"></i></button>
+  </div>
+</div>
+
+<div class="step" id="s3">
+  <p class="slabel">Step 3 of 5 — Progress</p>
+  <p class="stitle">Strengths, development areas, action plans</p>
+  <p class="ssub">Purple = strength. Orange = development area (max 2 per subject). Then rate last year's action plans.</p>
+  <div class="tabs" id="ct3"></div>
+  <div class="tabs" id="st3"></div>
+  <div id="progBody"></div>
+  <div class="nav">
+    <button class="btn" onclick="go(2)"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+    <button class="btn btn-p" onclick="go(4)">Next: CCE <i class="ti ti-arrow-right" aria-hidden="true"></i></button>
+  </div>
+</div>
+
+<div class="step" id="s4">
+  <p class="slabel">Step 4 of 5 — CCE</p>
+  <p class="stitle">Activities and programmes</p>
+  <p class="ssub">Toggle what each child participated in. Import from Google Calendar below.</p>
+  <div class="calbx">
+    <div class="ctitle" style="margin-bottom:.5rem"><i class="ti ti-calendar" aria-hidden="true"></i> Import from Google Calendar</div>
+    <div class="calrow"><div class="calnum">1</div><div class="caltxt">Click the button to ask Claude to scan your calendar.</div></div>
+    <div class="calrow"><div class="calnum">2</div><div class="caltxt">Copy Claude's reply and paste it into the box below.</div></div>
+    <div class="calrow"><div class="calnum">3</div><div class="caltxt">Click Import — matched events appear in each child's list.</div></div>
+    <button class="btn btn-p" style="margin-top:.75rem" onclick="calScan()"><i class="ti ti-calendar-event" aria-hidden="true"></i> Scan calendar ↗</button>
+  </div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div class="ctitle"><i class="ti ti-clipboard-text" aria-hidden="true"></i> Paste calendar event list</div>
+    <textarea id="calPaste" rows="4" placeholder="Paste Claude's returned event list here (one event per line)..."></textarea>
+    <div style="margin-top:.5rem;display:flex;align-items:center;gap:10px">
+      <button class="btn btn-p" onclick="importCal()"><i class="ti ti-download" aria-hidden="true"></i> Import events</button>
+      <span id="calStatus" style="font-size:12px;color:var(--color-text-secondary)"></span>
+    </div>
+  </div>
+  <div class="tabs" id="ct4"></div>
+  <div id="cceBody"></div>
+  <div class="nav">
+    <button class="btn" onclick="go(3)"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+    <button class="btn btn-p" onclick="go(5)">Next: assessments <i class="ti ti-arrow-right" aria-hidden="true"></i></button>
+  </div>
+</div>
+
+<div class="step" id="s5">
+  <p class="slabel">Step 5 of 5 — Assessments</p>
+  <p class="stitle">Enter assessment scores</p>
+  <p class="ssub">3 samples per subject. Paper 1 Composition is required for English and Mother Tongue at P4, P5, and P6.</p>
+  <div class="tabs" id="ct5"></div>
+  <div id="assessBody"></div>
+  <div class="nav">
+    <button class="btn" onclick="go(4)"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+    <button class="btn btn-g" onclick="generate()"><i class="ti ti-sparkles" aria-hidden="true"></i> Generate APR briefs ↗</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+var STEPS=6,cur=0,activeChild=0,activeSubj='English';
+var AP_OPTS=['Fully achieved','Mostly achieved','Partially achieved','Still ongoing'];
+var AP_CLS_LIST=['sf','sm','sp','so'];
+var ACCENT_COLORS=['#3B6D11','#185FA5','#854F0B','#534AB7'];
+var SUBJS=['English','Mathematics','Mother Tongue','Science'];
+var STR={English:['Reads independently and fluently','Reads above age-level texts','Strong comprehension and inference','Identifies themes and character motivation','Strong vocabulary (spoken and written)','Writes organised multi-paragraph work','Uses IEW stylistic techniques consistently','Writes with varied sentence structures','Revises and edits independently','Confident oral expression and projection','Strong audiobook comprehension and recall','Reading aloud with expression and pacing','Self-directed reading habits','Writes in legible cursive script'],Mathematics:['Strong number sense across all operations','Fluent with fractions, decimals, percentages','Problem-solving with multi-step tasks','Geometry and spatial reasoning','Probability and combinatorics','Coordinate systems and graphing','Measurement and unit conversion','Data handling and interpretation','Explains reasoning clearly','Persists through non-routine problems','Ahead of grade-level expectations','Strong mental arithmetic','Applies maths to real-world contexts'],'Mother Tongue':['Strong character recognition (500+)','Strong character recognition (1000+)','Strong character recognition (1500+)','Strong character recognition (2000+)','Communicates confidently with native speakers','Reads age-appropriate texts independently','Writing stamina and accuracy','Strong oral fluency in lessons','Completed immersion programme successfully','High intrinsic motivation for language','Above-grade vocabulary level','Strong listening comprehension','Uses language for authentic communication'],Science:['Strong conceptual understanding','Engagement with hands-on experiments','Above grade-level curriculum coverage','Applies scientific reasoning to new problems','Processes data and draws conclusions','Strong recall of topic content','Scientific curiosity and questioning','Accurate observation skills','Good experimental write-up habits']};
+var GAP={English:['PSLE exam technique and pacing','Greater precision in grammar','More concise writing','Stronger editing habits','Improved paragraph structure','Deeper literary analysis','More inferential comprehension','Wider genre exposure','Oral exam technique','None significant'],Mathematics:['PSLE format familiarity and pacing','MOE topic consolidation','Algebraic thinking foundations','Greater speed on routine calculations','Structured solution presentation','Data and graph question technique','None significant'],'Mother Tongue':['PSLE comprehension question types','Oral exam technique (picture discussion)','Listening comprehension','Character writing speed and stamina','Inference and contextual reasoning in reading','None significant'],Science:['PSLE structured question technique','Data-based and graph questions','MOE-format written response skills','Consistency across all topic areas','None significant']};
+var DEF_CCE=[{n:'Museum or heritage visit',t:'National Education',on:false},{n:'Theatre or performance',t:'Arts',on:false},{n:'Sports training or coaching',t:'Sport',on:false},{n:'Swimming lessons',t:'Sport',on:false},{n:'Arts or music lessons',t:'Arts / Music',on:false},{n:'Learning journey or field trip',t:'National Education',on:false},{n:'Cultural enrichment programme',t:'Cultural immersion',on:false},{n:'Community service or volunteer work',t:'National Education',on:false},{n:'Online safety or cyber wellness programme',t:'Cyber Wellness',on:false},{n:'Growing-up / puberty education',t:'Sexuality Education',on:false},{n:'Mental health or wellbeing support',t:'Mental Health',on:false},{n:'Faith or community group',t:'Family / Faith',on:false},{n:'STEM, coding or enrichment class',t:'Enrichment / ECG',on:false},{n:'Career exploration or ECG activity',t:'Enrichment / ECG',on:false}];
+var C=[];
+function initC(){C=[mkChild('',''),mkChild('','')];}
+function mkChild(name,level){return{name:name||'',level:level||'P1',hasSci:false,curricula:{English:'',Mathematics:'','Mother Tongue':'',Science:''},str:mkStr(),gap:mkGap(),aps:{English:[],Mathematics:[],'Mother Tongue':[],Science:[]},apst:{English:{},Mathematics:{},'Mother Tongue':{},Science:{}},cce:DEF_CCE.map(function(x){return{n:x.n,t:x.t,on:x.on};}),assess:[]};}
+function mkStr(){var o={};SUBJS.forEach(function(s){o[s]={};STR[s].forEach(function(_,i){o[s][i]=false;});});return o;}
+function mkGap(){var o={};SUBJS.forEach(function(s){o[s]={};GAP[s].forEach(function(_,i){o[s][i]=false;});});return o;}
+function ensureAssess(ci){var c=C[ci],need=subjs(ci);if(!c.assess||c.assess.length!==need.length){c.assess=need.map(function(s){var p1=(s==='English'||s==='Mother Tongue')&&['P4','P5','P6'].indexOf(c.level)>=0;return{s:s,s1:p1?'Paper 1 Composition':'',m1:'',s2:'',m2:'',s3:'',m3:''};});}}
+function subjs(ci){var b=['English','Mathematics','Mother Tongue'];if(C[ci]&&C[ci].hasSci)b.push('Science');return b;}
+function pbar(){var el=document.getElementById('pbar');el.innerHTML='';for(var i=0;i<STEPS;i++){var d=document.createElement('div');d.className='pseg'+(i<cur?' done':i===cur?' active':'');el.appendChild(d);}}
+function go(n){document.getElementById('s'+cur).classList.remove('active');cur=n;document.getElementById('s'+cur).classList.add('active');pbar();activeChild=0;if(n===1)renderChildren();if(n===2){buildTabs('ct2','onb',renderCurric);renderCurric();}if(n===3){buildTabs('ct3','on',renderProg);activeSubj=subjs(activeChild)[0]||'English';buildSubjTabs();renderProg();}if(n===4){buildTabs('ct4','on',renderCCE);renderCCE();}if(n===5){buildTabs('ct5','on',renderAssess);renderAssess();}}
+function buildTabs(id,cls,fn){var el=document.getElementById(id);el.innerHTML='';C.forEach(function(c,i){var b=document.createElement('button');b.className='tab'+(i===activeChild?' '+cls:'');b.textContent=c.name||('Child '+(i+1));b.onclick=function(){activeChild=i;el.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on','onb');});b.classList.add(cls);if(id==='ct3'){activeSubj=subjs(i)[0]||'English';buildSubjTabs();}fn();};el.appendChild(b);});}
+function buildSubjTabs(){var el=document.getElementById('st3');if(!el)return;el.innerHTML='';subjs(activeChild).forEach(function(s){var b=document.createElement('button');b.className='tab onb'+(s===activeSubj?' on':'');b.textContent=s;b.onclick=function(){activeSubj=s;el.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});b.classList.add('on');renderProg();};el.appendChild(b);});}
+function renderChildren(){var el=document.getElementById('childRows');el.innerHTML='';C.forEach(function(c,i){var row=document.createElement('div');row.className='crow';row.innerHTML='<div><span class="lbl">Name</span><input type="text" value="'+esc(c.name)+'" placeholder="Full name" onchange="C['+i+'].name=this.value"></div>'+'<div><span class="lbl">Level</span><select onchange="C['+i+'].level=this.value">'+['P1','P2','P3','P4','P5','P6'].map(function(l){return'<option'+(c.level===l?' selected':'')+'>'+l+'</option>';}).join('')+'</select></div>'+'<div><span class="lbl">Science?</span><select onchange="C['+i+'].hasSci=this.value===\'yes\'">'+'<option value="no"'+(c.hasSci?'':' selected')+'>No</option>'+'<option value="yes"'+(c.hasSci?' selected':'')+'>Yes</option>'+'</select></div>'+(C.length>1?'<button class="btn" style="height:34px;color:#993C1D;border-color:#993C1D" onclick="removeC('+i+')"><i class="ti ti-trash" aria-hidden="true"></i></button>':'<div></div>');el.appendChild(row);});document.getElementById('addChBtn').style.display=C.length>=4?'none':'inline-flex';}
+function addChild(){if(C.length>=4)return;C.push(mkChild('',''));renderChildren();}
+function removeC(i){C.splice(i,1);if(activeChild>=C.length)activeChild=C.length-1;renderChildren();}
+function renderCurric(){var ci=activeChild,c=C[ci],panel=document.getElementById('curricBody');panel.innerHTML='';subjs(ci).forEach(function(s){var card=document.createElement('div');card.className='card';card.innerHTML='<div class="ctitle"><i class="ti ti-book" aria-hidden="true"></i> '+s+'</div>'+'<textarea rows="3" placeholder="List curricula, platforms, programmes in use — one per line..." onchange="C['+ci+'].curricula[\''+s+'\']=this.value">'+esc(c.curricula[s]||'')+'</textarea>';panel.appendChild(card);});}
+function renderProg(){var ci=activeChild,c=C[ci],s=activeSubj,panel=document.getElementById('progBody');panel.innerHTML='';var sc=document.createElement('div');sc.className='card';sc.innerHTML='<div class="ctitle"><i class="ti ti-star" aria-hidden="true"></i> '+s+' strengths</div><div class="mx" id="strMx"></div>';panel.appendChild(sc);var smx=sc.querySelector('#strMx');STR[s].forEach(function(item,idx){var isSel=c.str[s]&&c.str[s][idx],isAI=c._aiStr&&c._aiStr[s]&&c._aiStr[s].indexOf(item)>=0;var d=document.createElement('div');d.className='mi'+(isSel?' s':'');d.innerHTML='<div class="mck"></div><span class="ml">'+esc(item)+(isAI?'<span class="aibadge"><i class="ti ti-sparkles" aria-hidden="true"></i> AI</span>':'')+'</span>';d.onclick=function(){C[ci].str[s][idx]=!C[ci].str[s][idx];d.classList.toggle('s',C[ci].str[s][idx]);};smx.appendChild(d);});var gc=document.createElement('div');gc.className='card';gc.innerHTML='<div class="ctitle"><i class="ti ti-trending-up" aria-hidden="true"></i> '+s+' development areas <span style="font-size:11px;color:var(--color-text-secondary);margin-left:4px">max 2</span></div><div class="mx" id="gapMx"></div>';panel.appendChild(gc);var gmx=gc.querySelector('#gapMx');GAP[s].forEach(function(item,idx){var isSel=c.gap[s]&&c.gap[s][idx];var d=document.createElement('div');d.className='mi'+(isSel?' sg':'');d.innerHTML='<div class="mck"></div><span class="ml">'+esc(item)+'</span>';d.onclick=function(){var count=Object.values(C[ci].gap[s]).filter(Boolean).length;if(!C[ci].gap[s][idx]&&count>=2)return;C[ci].gap[s][idx]=!C[ci].gap[s][idx];d.classList.toggle('sg',C[ci].gap[s][idx]);};gmx.appendChild(d);});var ac=document.createElement('div');ac.className='card';var plans=(c.aps&&c.aps[s])||[];ac.innerHTML='<div class="ctitle"><i class="ti ti-checkbox" aria-hidden="true"></i> '+s+' — rate last year\'s action plans</div>'+(plans.length?'':'<p style="font-size:13px;color:var(--color-text-secondary)">No plans imported. They will be generated fresh.</p>')+'<div id="apRows"></div>';panel.appendChild(ac);var ar=ac.querySelector('#apRows');plans.forEach(function(plan,pi){var st=(c.apst[s]&&c.apst[s][pi])||'';var rated=!!st;var savedIdx=rated?AP_OPTS.indexOf(st):0;var accent=rated?ACCENT_COLORS[savedIdx]:'#B4B2A9';var statusHtml=rated?'<span class="apsl-status '+AP_CLS_LIST[savedIdx]+'">'+esc(AP_OPTS[savedIdx])+'</span>':'<span class="apsl-status">Drag to set rating</span>';var row=document.createElement('div');row.className='aprow';row.innerHTML='<p class="aptxt">'+esc(plan)+'</p><div class="apsl-wrap'+(rated?' is-rated':'')+'"><input type="range" class="apsl" min="0" max="3" step="1" value="'+savedIdx+'" style="accent-color:'+accent+'" oninput="liveAP(this,'+ci+',\''+s+'\','+pi+')" onchange="rateAP('+ci+',\''+s+'\','+pi+',this.value)"><div class="apsl-labels"><span>Fully<br>achieved</span><span>Mostly<br>achieved</span><span>Partially<br>achieved</span><span>Still<br>ongoing</span></div><div class="apsl-foot">'+statusHtml+'</div></div>';ar.appendChild(row);});}
+function rateAP(ci,s,pi,oi){if(!C[ci].apst[s])C[ci].apst[s]={};C[ci].apst[s][pi]=AP_OPTS[parseInt(oi,10)];renderProg();}
+function liveAP(el,ci,s,pi){var oi=parseInt(el.value,10);el.style.accentColor=ACCENT_COLORS[oi];var wrap=el.parentNode;var foot=wrap.querySelector('.apsl-foot');if(foot)foot.innerHTML='<span class="apsl-status '+AP_CLS_LIST[oi]+'">'+AP_OPTS[oi]+'</span>';wrap.classList.add('is-rated');}
+function renderCCE(){var ci=activeChild,c=C[ci],panel=document.getElementById('cceBody');panel.innerHTML='';var sections=[{label:'National Education / Social Development',filter:function(x){return/National|Cultural|Sport|Academic|Arts/.test(x.t);}},{label:'Character Education / Values Education',filter:function(x){return/Cyber|Sexuality|Mental|Faith|ECG/.test(x.t);}}];sections.forEach(function(sec){var items=c.cce.filter(sec.filter);if(!items.length)return;var card=document.createElement('div');card.className='card';card.innerHTML='<div class="secdiv">'+sec.label+'</div>';items.forEach(function(item){var gi=c.cce.indexOf(item);var row=document.createElement('div');row.className='cce-row';var badge=item.cal?'<span class="aibadge" style="background:#E1F5EE;color:#085041"><i class="ti ti-calendar" aria-hidden="true"></i> calendar</span>':'';row.innerHTML='<button class="tog'+(item.on?' on':'')+'" onclick="togCCE('+ci+','+gi+',this)" aria-label="Toggle '+esc(item.n)+'"></button>'+'<div><p class="ccename">'+esc(item.n)+' '+badge+'</p><p class="ccetype">'+esc(item.t)+'</p></div>';card.appendChild(row);});panel.appendChild(card);});var other=c.cce.filter(function(x){return!sections.some(function(sec){return sec.filter(x);});});if(other.length){var card2=document.createElement('div');card2.className='card';card2.innerHTML='<div class="secdiv">Other</div>';other.forEach(function(item){var gi=c.cce.indexOf(item);var row=document.createElement('div');row.className='cce-row';row.innerHTML='<button class="tog'+(item.on?' on':'')+'" onclick="togCCE('+ci+','+gi+',this)"></button>'+'<div><p class="ccename">'+esc(item.n)+'</p><p class="ccetype">'+esc(item.t)+'</p></div>';card2.appendChild(row);});panel.appendChild(card2);}var addCard=document.createElement('div');addCard.className='card';addCard.innerHTML='<div class="ctitle"><i class="ti ti-plus" aria-hidden="true"></i> Add activity</div>'+'<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">'+'<div><span class="lbl">Activity name</span><input type="text" id="newN" placeholder="e.g. Tennis training"></div>'+'<div><span class="lbl">Category</span><select id="newT"><option>Sport</option><option>Arts / Music</option><option>National Education</option><option>Academic enrichment</option><option>Cultural immersion</option><option>Cyber Wellness</option><option>Mental Health</option><option>Family / Faith</option><option>Enrichment / ECG</option></select></div>'+'<button class="btn btn-p" onclick="addCCE('+ci+')" style="height:34px">Add</button></div>';panel.appendChild(addCard);}
+function togCCE(ci,gi,btn){C[ci].cce[gi].on=!C[ci].cce[gi].on;btn.classList.toggle('on');}
+function addCCE(ci){var n=document.getElementById('newN').value.trim(),t=document.getElementById('newT').value;if(!n)return;C[ci].cce.push({n:n,t:t,on:true});document.getElementById('newN').value='';renderCCE();}
+function renderAssess(){var ci=activeChild;ensureAssess(ci);var c=C[ci],panel=document.getElementById('assessBody');panel.innerHTML='';c.assess.forEach(function(row,ri){var card=document.createElement('div');card.className='card';var html='<div class="ctitle"><i class="ti ti-file-description" aria-hidden="true"></i> '+row.s+'</div>';['s1','s2','s3'].forEach(function(sk,si){var mk=sk.replace('s','m'),isP1=si===0&&(row.s==='English'||row.s==='Mother Tongue')&&['P4','P5','P6'].indexOf(C[ci].level)>=0;html+='<div style="margin-bottom:10px"><p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px">Sample '+(si+1)+(isP1?' — Paper 1 Composition (required)':'')+'</p>'+'<div style="display:grid;grid-template-columns:1fr 100px;gap:8px">'+'<input type="text" placeholder="Mode of assessment" value="'+esc(row[sk]||'')+'" onchange="C['+ci+'].assess['+ri+'][\''+sk+'\']=this.value">'+'<input type="text" placeholder="Score" value="'+esc(row[mk]||'')+'" onchange="C['+ci+'].assess['+ri+'][\''+mk+'\']=this.value">'+'</div></div>';});card.innerHTML=html;panel.appendChild(card);});}
+var aprExtractedText='';
+function dzOver(e){e.preventDefault();document.getElementById('dropzone').classList.add('over');}
+function dzLeave(e){document.getElementById('dropzone').classList.remove('over');}
+function dzDrop(e){e.preventDefault();var dz=document.getElementById('dropzone');dz.classList.remove('over');var f=e.dataTransfer.files[0];if(f)handleFile(f);}
+function handleFile(f){if(!f)return;if(!f.name.toLowerCase().endsWith('.docx')){document.getElementById('fileStatus').textContent='Please upload a .docx file.';return;}var dz=document.getElementById('dropzone');document.getElementById('dzLabel').textContent='Reading '+f.name+'...';document.getElementById('dzSub').textContent='Extracting text';document.getElementById('fileStatus').textContent='';var reader=new FileReader();reader.onload=function(e){var ab=e.target.result;if(typeof mammoth==='undefined'){document.getElementById('fileStatus').innerHTML='<span class="pill pill-err">mammoth.js not loaded — check network</span>';document.getElementById('dzLabel').textContent='Click to choose file, or drag and drop';document.getElementById('dzSub').textContent='.docx files only';return;}mammoth.extractRawText({arrayBuffer:ab}).then(function(result){aprExtractedText=result.value||'';var words=aprExtractedText.trim().split(/\s+/).filter(Boolean).length;dz.classList.add('ready');document.getElementById('dzLabel').textContent=f.name;document.getElementById('dzSub').textContent=words.toLocaleString()+' words extracted';document.getElementById('fileStatus').innerHTML='<span class="pill pill-ok"><i class="ti ti-check" aria-hidden="true"></i> Ready — click Send to Claude</span>';}).catch(function(err){document.getElementById('fileStatus').innerHTML='<span class="pill pill-err">Could not read file: '+esc(err.message||String(err))+'</span>';document.getElementById('dzLabel').textContent='Click to choose file, or drag and drop';document.getElementById('dzSub').textContent='.docx files only';dz.classList.remove('ready');});};reader.readAsArrayBuffer(f);}
+function sendForExtraction(){if(!aprExtractedText||aprExtractedText.trim().length<50){document.getElementById('fileStatus').innerHTML='<span class="pill pill-err">Upload a file first, or paste APR text into the box below.</span>';return;}
+var strLabels='PREDEFINED STRENGTH LABELS (match APR text against these exact strings for each subject):\nEnglish: '+STR.English.join(' | ')+'\nMathematics: '+STR.Mathematics.join(' | ')+'\nMother Tongue: '+STR['Mother Tongue'].join(' | ')+'\nScience: '+STR.Science.join(' | ');
+var gapLabels='PREDEFINED GAP LABELS (match APR text against these exact strings for each subject):\nEnglish: '+GAP.English.join(' | ')+'\nMathematics: '+GAP.Mathematics.join(' | ')+'\nMother Tongue: '+GAP['Mother Tongue'].join(' | ')+'\nScience: '+GAP.Science.join(' | ');
+var prompt='Please extract structured data from the following Singapore MOE homeschool APR report text and return ONLY a valid JSON array. No markdown, no explanation, just the raw JSON.\n\n'
++'INSTRUCTIONS:\n'
++'1. Return one array element per child found in the report.\n'
++'2. For "strengths" and "gaps": read ALL subject sections in the APR text carefully, including Science. Match what is described to the predefined label lists below. Return only labels from the predefined lists — use the EXACT label string. If a subject has thin content, infer the best matching labels from any relevant text (e.g. science experiments described = "Engagement with hands-on experiments"). Return an empty array only if there is truly no relevant content at all.\n'
++'3. For "curricula": extract the full list of programmes, books, platforms mentioned for each subject as a single string.\n'
++'4. For "aps": extract action plan items as short plain-text strings, one per array element.\n'
++'5. For "cce": extract activity and programme names as plain strings.\n'
++'6. Set hasSci to true if Science content appears anywhere in the report.\n\n'
++strLabels+'\n\n'
++gapLabels+'\n\n'
++'OUTPUT SCHEMA (one element per child):\n'
++'[{"name":"","level":"P1-P6","hasSci":true,"curricula":{"English":"","Mathematics":"","Mother Tongue":"","Science":""},"strengths":{"English":[],"Mathematics":[],"Mother Tongue":[],"Science":[]},"gaps":{"English":[],"Mathematics":[],"Mother Tongue":[],"Science":[]},"aps":{"English":[],"Mathematics":[],"Mother Tongue":[],"Science":[]},"cce":[]}]\n\n'
++'APR text:\n'+aprExtractedText.slice(0,9000);
+sendPrompt(prompt);}
+function importJSON(){var raw=document.getElementById('jsonPaste').value.trim(),el=document.getElementById('importStatus');if(!raw){el.innerHTML='<span class="pill pill-err">Nothing pasted</span>';return;}try{var clean=raw.replace(/```json|```/g,'').trim(),parsed=JSON.parse(clean);if(!Array.isArray(parsed))parsed=[parsed];C=parsed.map(function(d){var c=mkChild(d.name||'',d.level||'P1');c.hasSci=!!d.hasSci;if(d.curricula){SUBJS.forEach(function(s){if(d.curricula[s])c.curricula[s]=Array.isArray(d.curricula[s])?d.curricula[s].join('\n'):d.curricula[s];});}if(d.strengths){c._aiStr=d.strengths;SUBJS.forEach(function(s){if(!d.strengths[s])return;STR[s].forEach(function(item,idx){c.str[s][idx]=d.strengths[s].indexOf(item)>=0;});});}if(d.gaps){SUBJS.forEach(function(s){if(!d.gaps[s])return;GAP[s].forEach(function(item,idx){c.gap[s][idx]=d.gaps[s].indexOf(item)>=0;});});}if(d.aps){SUBJS.forEach(function(s){if(d.aps[s])c.aps[s]=d.aps[s];});}if(d.cce&&d.cce.length){d.cce.forEach(function(name){var exists=c.cce.some(function(x){return x.n.toLowerCase().slice(0,15)===String(name).toLowerCase().slice(0,15);});if(!exists)c.cce.push({n:String(name),t:'Academic enrichment',on:true});else c.cce.forEach(function(x){if(x.n.toLowerCase().slice(0,15)===String(name).toLowerCase().slice(0,15))x.on=true;});});}return c;});el.innerHTML='<span class="pill pill-ok"><i class="ti ti-check" aria-hidden="true"></i> '+C.length+' child'+(C.length>1?'ren':'')+' imported</span>';}catch(e){el.innerHTML='<span class="pill pill-err"><i class="ti ti-x" aria-hidden="true"></i> Invalid JSON — check the paste</span>';}}
+function calScan(){sendPrompt('Please scan my Google Calendar from 1 January of this year to today and list all events relevant to my children\'s CCE (Character and Citizenship Education) for their MOE homeschool APR. Include: museum visits, heritage tours, theatre and performances, sports training, arts and music lessons, coding camps, enrichment programmes, learning journeys, overseas trips, cultural experiences, faith community activities. Exclude: bill payments, household reminders, birthdays, car rentals, and admin events. Return a plain numbered list — one event per line — with the date and event name only. No extra commentary.');}
+function importCal(){var text=document.getElementById('calPaste').value.trim(),status=document.getElementById('calStatus');if(!text){status.textContent='Nothing pasted.';return;}var lines=text.split('\n').filter(function(l){return l.trim().length>3;}),added=0;lines.forEach(function(line){line=line.replace(/^\d+[\.\)]\s*/,'').trim();if(!line)return;var type=classifyType(line);C.forEach(function(c){var exists=c.cce.some(function(x){return x.n.toLowerCase().slice(0,20)===line.toLowerCase().slice(0,20);});if(!exists){c.cce.push({n:line,t:type,on:true,cal:true});added++;}});});status.textContent=added+' event'+(added!==1?'s':'')+' added.';renderCCE();}
+function classifyType(n){var l=n.toLowerCase();if(/museum|heritage|history|monument|fort|gallery|national|parliament|discovery/.test(l))return'National Education';if(/theatre|musical|concert|performance|opera|ballet|play|srt|esplanade|show/.test(l))return'Arts';if(/safari|zoo|nature|wildlife|conservation|river|botanic|park|tour|factory|facility|e.waste|silkworm/.test(l))return'National Education';if(/soccer|football|badminton|tennis|swim|run|gymnastics|martial|sport|training|hockey/.test(l))return'Sport';if(/piano|violin|guitar|music lesson|choir|art class|painting|drawing|art studio/.test(l))return'Arts / Music';if(/coding|stem|robot|computer|tech|vivita|tinker|hack|science camp|maker/.test(l))return'Enrichment / ECG';if(/immersion|china|taiwan|japan|language camp|mandarin camp/.test(l))return'Cultural immersion';if(/cyber|digital|online safety|screen/.test(l))return'Cyber Wellness';if(/church|devotion|faith|bible|chapel|community group/.test(l))return'Family / Faith';return'Academic enrichment';}
+function generate(){var lines=['I have completed the APR intake form. Generate complete APR draft sections for each child.\n'];C.forEach(function(c,ci){ensureAssess(ci);lines.push('=== '+(c.name||'Child '+(ci+1)).toUpperCase()+' ('+c.level+') ===\n');lines.push('CURRICULA:');subjs(ci).forEach(function(s){lines.push(s+': '+(c.curricula[s]||'[not specified]').replace(/\n/g,'; '));});lines.push('\nSTRENGTHS:');subjs(ci).forEach(function(s){var sel=STR[s].filter(function(_,i){return c.str[s]&&c.str[s][i];});lines.push(s+': '+(sel.length?sel.join('; '):'None selected'));});lines.push('\nDEVELOPMENT AREAS:');subjs(ci).forEach(function(s){var sel=GAP[s].filter(function(_,i){return c.gap[s]&&c.gap[s][i];});lines.push(s+': '+(sel.length?sel.join('; '):'None significant'));});lines.push('\nACTION PLAN OUTCOMES:');subjs(ci).forEach(function(s){(c.aps[s]||[]).forEach(function(plan,pi){var st=(c.apst[s]&&c.apst[s][pi])||'not rated';lines.push('- ['+st+'] '+s+': '+plan);});});lines.push('\nCCE ACTIVITIES:');c.cce.filter(function(x){return x.on;}).forEach(function(x){lines.push('- '+x.n+' ('+x.t+')');});lines.push('\nASSESSMENT SAMPLES:');c.assess.forEach(function(r){lines.push(r.s+': S1: '+(r.s1||'TBC')+' ['+(r.m1||'TBC')+'], S2: '+(r.s2||'TBC')+' ['+(r.m2||'TBC')+'], S3: '+(r.s3||'TBC')+' ['+(r.m3||'TBC')+']');});lines.push('');});var hasPSLE=C.some(function(c){return c.level==='P5'||c.level==='P6';});lines.push('INSTRUCTIONS: For each child, write complete APR section text following the 2026 MOE homeschool template. Each subject must include: (1) Curricula, (2) Strengths, (3) Building on Strengths, (4) Areas for Improvement or Learning Gaps, (5) Addressing Areas for Improvement. '+(hasPSLE?'Frame P5/P6 subjects around PSLE readiness. ':'')+'Generate CCE table entries with child-specific outcome sentences — do not reuse sentences across children for shared activities. Use formal educator register, UK English, no em-dashes.');sendPrompt(lines.join('\n'));}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+if(typeof sendPrompt==='undefined'){
+  window.sendPrompt=function(text){
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){
+        var n=document.createElement('div');
+        n.style.cssText='position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#2C2C2A;color:#fff;font-size:13px;padding:10px 18px;border-radius:8px;z-index:9999;max-width:420px;text-align:center;line-height:1.4';
+        n.textContent='Prompt copied to clipboard. Paste it into Claude to continue.';
+        document.body.appendChild(n);
+        setTimeout(function(){n.remove();},4000);
+      });
+    } else {
+      var ta=document.createElement('textarea');
+      ta.value=text;
+      ta.style.cssText='position:fixed;top:-9999px;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      alert('Prompt copied. Paste it into Claude to continue.');
+    }
+  };
+}
+
+initC();pbar();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+</body>
+</html>

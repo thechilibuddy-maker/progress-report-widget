@@ -8,7 +8,7 @@ No login. No account. No data storage. Everything runs in your browser.
 
 ## What it does
 
-The widget walks you through six structured steps, then sends your data to Claude to produce a formal APR draft in the correct MOE educator register.
+The widget walks you through six structured steps, then sends your data to Claude to produce a formal APR draft in the correct MOE educator register. To open it within Claude Chat, drop the file into the chatbox and copy/paste "Run inline with the visualizer tool"
 
 **Step 0: Import last year's APR (optional)**
 
